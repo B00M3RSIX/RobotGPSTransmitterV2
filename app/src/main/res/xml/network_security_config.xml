@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Erlaube unverschlüsselte Verbindungen zu lokalen IP-Adressen im 192er Bereich -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">192.168.178.35</domain>
+        <!-- Für alle 192er Netzwerke -->
+        <domain-config cleartextTrafficPermitted="true">
+            <domain includeSubdomains="true">192.168.0.0/16</domain>
+        </domain-config>
+    </domain-config>
+    
+    <!-- Standardeinstellung für alle anderen Domains -->
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>

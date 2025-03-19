@@ -1,0 +1,44 @@
+<resources>
+    <string name="app_name">GPS Transmitter</string>
+    <string name="settings_title">Einstellungen</string>
+    
+    <!-- Main Activity -->
+    <string name="connect">Verbinden</string>
+    <string name="disconnect">Trennen</string>
+    <string name="start_publishing">Veröffentlichung starten</string>
+    <string name="stop_publishing">Veröffentlichung stoppen</string>
+    <string name="connection_status">Verbindungsstatus: %1$s</string>
+    <string name="messages_sent">Gesendete Nachrichten: %1$d</string>
+    <string name="coordinates">Koordinaten: %1$.6f, %2$.6f</string>
+    <string name="altitude">Höhe: %1$.2f m</string>
+    <string name="accuracy">Genauigkeit: %1$.2f m</string>
+    <string name="last_update">Letztes Update: %1$s</string>
+    <string name="copy_coordinates">Koordinaten kopieren</string>
+    
+    <!-- Settings Activity -->
+    <string name="connection_settings">Verbindungseinstellungen</string>
+    <string name="server_url">Server URL</string>
+    <string name="test_connection">Verbindung testen</string>
+    <string name="topic_settings">Topic-Einstellungen</string>
+    <string name="topic_name">Topic-Name</string>
+    <string name="frame_id">Frame ID</string>
+    <string name="publish_interval">Veröffentlichungsintervall</string>
+    <string name="minutes">Minuten</string>
+    <string name="seconds">Sekunden</string>
+    <string name="retry_settings">Wiederholungseinstellungen</string>
+    <string name="max_retry_attempts">Max. Wiederholungsversuche</string>
+    <string name="max_retry_delay">Max. Wiederholungsverzögerung</string>
+    <string name="battery_management">Batterie-Management</string>
+    <string name="battery_warning_level">Batteriewarnstufe (%)</string>
+    <string name="battery_shutdown_level">Batterie-Abschaltstufe (%)</string>
+    <string name="save_settings">Einstellungen speichern</string>
+    <string name="reload_values">Werte neu laden</string>
+    
+    <!-- Notifications -->
+    <string name="notification_channel_normal">GPS-Tracking</string>
+    <string name="notification_channel_error">GPS-Tracking Fehler</string>
+    <string name="notification_channel_battery">GPS-Tracking Batterie</string>
+    <string name="notification_title_normal">GPS-Tracking aktiv</string>
+    <string name="notification_title_error">GPS-Tracking Fehler</string>
+    <string name="notification_title_battery">GPS-Tracking - Batterie niedrig</string>
+</resources>

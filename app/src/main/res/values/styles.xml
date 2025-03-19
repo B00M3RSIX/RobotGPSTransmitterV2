@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Style for NumberPicker with white text -->
+    <style name="NumberPickerTheme">
+        <item name="android:textColorPrimary">@color/white</item>
+        <item name="colorControlNormal">@color/button_light_blue</item>
+    </style>
+</resources>
