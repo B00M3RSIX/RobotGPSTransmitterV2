@@ -20,4 +20,7 @@
     <color name="status_connected">#81C784</color>
     <color name="status_disconnected">#E57373</color>
     <color name="status_waiting">#FFD54F</color>
+    
+    <!-- App-Icon-Farben -->
+    <color name="ic_launcher_background">#3F51B5</color>
 </resources>

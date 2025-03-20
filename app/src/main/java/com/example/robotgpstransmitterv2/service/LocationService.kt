@@ -32,6 +32,14 @@ import kotlin.properties.Delegates
  */
 class LocationService : Service(), LocationListener {
 
+    companion object {
+        // Statische Instanz für den Zugriff von außen
+        @Volatile
+        private var instance: LocationService? = null
+        
+        fun getInstance(): LocationService? = instance
+    }
+
     // Systemdienste
     private lateinit var notificationManager: NotificationManager
     private lateinit var locationManager: LocationManager
@@ -55,6 +63,47 @@ class LocationService : Service(), LocationListener {
     private var currentState by Delegates.observable(ServiceState.INITIALIZED) { _, oldState, newState ->
         Logger.service("Zustandsänderung: $oldState -> $newState")
         updateNotification()
+        updateViewModelStatus(newState)
+    }
+    
+    /**
+     * Aktualisiert den Status im ViewModel basierend auf dem aktuellen Service-Zustand
+     */
+    private fun updateViewModelStatus(state: ServiceState) {
+        // ViewModel kann null sein, wenn diese Methode zu früh aufgerufen wird
+        if (viewModel == null) {
+            Logger.service("ViewModel ist null, Status-Update übersprungen")
+            return
+        }
+        
+        val statusText = when (state) {
+            ServiceState.INITIALIZED -> "Initialisiert"
+            ServiceState.STARTING -> "Wird gestartet"
+            ServiceState.CONNECTING -> "Verbindung wird hergestellt"
+            ServiceState.CONNECTED -> "Verbunden"
+            ServiceState.ADVERTISING -> "Kündige Topic an"
+            ServiceState.PUBLISHING -> "Veröffentliche GPS-Daten"
+            ServiceState.UNADVERTISING -> "Melde Topic ab"
+            ServiceState.ERROR -> "Fehler"
+            ServiceState.DESTROYED -> "Beendet"
+        }
+        
+        val isConnected = state == ServiceState.CONNECTED || 
+                         state == ServiceState.ADVERTISING || 
+                         state == ServiceState.PUBLISHING
+        val isAdvertised = state == ServiceState.ADVERTISING || 
+                          state == ServiceState.PUBLISHING
+        
+        // Direkt auf dem Hauptthread aktualisieren
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            Logger.service("Aktualisiere ViewModel-Status zu: $statusText")
+            
+            // Direkt das LiveData aktualisieren
+            viewModel?.connectionStatus?.value = statusText
+            
+            // Auch die Hilfsmethode aufrufen für Konsistenz
+            viewModel?.updateConnectionStatus(statusText, isConnected, isAdvertised)
+        }
     }
     
     // Timer für Standortaktualisierungen
@@ -74,6 +123,9 @@ class LocationService : Service(), LocationListener {
     override fun onCreate() {
         super.onCreate()
         Logger.service("LocationService wird erstellt")
+        
+        // Statische Instanz setzen
+        instance = this
         
         // Systemdienste initialisieren
         notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -105,6 +157,9 @@ class LocationService : Service(), LocationListener {
                     
                     // Wake-Lock erwerben, um CPU-Aktivität im Hintergrund zu gewährleisten
                     acquireWakeLock()
+                    
+                    // Verbindungsstatus aktualisieren
+                    viewModel?.updateConnectionStatus("Verbindung wird hergestellt...", false, false)
                     
                     // WebSocket initialisieren und verbinden
                     initWebSocket()
@@ -156,16 +211,42 @@ class LocationService : Service(), LocationListener {
                 if (isConnected) {
                     Logger.connection("WebSocket verbunden")
                     currentState = ServiceState.CONNECTED
-                    viewModel?.updateConnectionStatus("Verbunden", true, false)
+                    
+                    // Stelle sicher, dass das ViewModel aktualisiert wird
+                    // Verwende Handler für UI-Thread-Updates
+                    android.os.Handler(android.os.Looper.getMainLooper()).post {
+                        viewModel?.let { vm ->
+                            // Explizit den connectionStatus aktualisieren
+                            vm.connectionStatus?.value = "Verbunden"
+                            vm.updateConnectionStatus("Verbunden", true, false)
+                        }
+                        
+                        // Automatisch mit dem Publishing beginnen, wenn verbunden
+                        startPublishing()
+                    }
                 } else {
                     Logger.connection("WebSocket Verbindung fehlgeschlagen: $errorMessage")
                     if (errorMessage != null && attemptCount >= maxRetryAttempts) {
                         currentState = ServiceState.ERROR
                         showErrorNotification("Verbindung fehlgeschlagen nach $maxRetryAttempts Versuchen")
-                        viewModel?.updateConnectionStatus("Fehler: $errorMessage", false, false)
+                        
+                        // Verwende Handler für UI-Thread-Updates
+                        android.os.Handler(android.os.Looper.getMainLooper()).post {
+                            viewModel?.connectionStatus?.value = "Fehler: $errorMessage"
+                            viewModel?.updateConnectionStatus("Fehler: $errorMessage", false, false)
+                        }
+                        
+                        // Stoppe die GPS-Veröffentlichung und den Service, wenn maximale Verbindungsversuche erreicht sind
+                        stopPublishing()
+                        stopSelf()
                     } else {
                         currentState = ServiceState.CONNECTING
-                        viewModel?.updateConnectionStatus("Verbindung wird hergestellt...", false, false)
+                        
+                        // Verwende Handler für UI-Thread-Updates
+                        android.os.Handler(android.os.Looper.getMainLooper()).post {
+                            viewModel?.connectionStatus?.value = "Verbindung wird hergestellt..."
+                            viewModel?.updateConnectionStatus("Verbindung wird hergestellt...", false, false)
+                        }
                     }
                 }
             }
@@ -187,24 +268,35 @@ class LocationService : Service(), LocationListener {
         currentState = ServiceState.ADVERTISING
         advertiseRosTopic()
         
-        // GPS-Updates anfordern
-        requestLocationUpdates()
-        
-        // Timer für regelmäßige Veröffentlichung starten
-        publishTimer = Timer().apply {
-            schedule(object : TimerTask() {
-                override fun run() {
-                    // Aktuelle Position abfragen und senden
-                    val lastLocation = getLastKnownLocation()
-                    if (lastLocation != null) {
-                        onLocationChanged(lastLocation)
-                    }
+        // GPS-Updates auf dem Hauptthread anfordern
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            try {
+                requestLocationUpdates()
+                
+                // Timer für regelmäßige Veröffentlichung starten
+                publishTimer = Timer().apply {
+                    schedule(object : TimerTask() {
+                        override fun run() {
+                            // Aktuelle Position abfragen und senden
+                            val lastLocation = getLastKnownLocation()
+                            if (lastLocation != null) {
+                                // Auf dem Hauptthread ausführen
+                                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                    onLocationChanged(lastLocation)
+                                }
+                            }
+                        }
+                    }, 0, publishInterval.toLong())
                 }
-            }, 0, publishInterval.toLong())
+                
+                currentState = ServiceState.PUBLISHING
+                viewModel?.updateConnectionStatus("Veröffentliche Daten", true, true)
+            } catch (e: Exception) {
+                Logger.error("Fehler beim Starten des Publishings", e)
+                currentState = ServiceState.ERROR
+                showErrorNotification("Fehler beim Starten des Publishings: ${e.message}")
+            }
         }
-        
-        currentState = ServiceState.PUBLISHING
-        viewModel?.updateConnectionStatus("Veröffentliche Daten", true, true)
     }
     
     /**
@@ -327,8 +419,10 @@ class LocationService : Service(), LocationListener {
             val success = webSocketManager?.send(messageJson) ?: false
             
             if (success) {
-                viewModel?.incrementMessageCount()
-                Logger.location("GPS-Daten gesendet")
+                // Aktualisiere den Nachrichtenzähler und den Zeitstempel der letzten Übertragung
+                val currentTime = System.currentTimeMillis()
+                viewModel?.incrementMessageCount(currentTime)
+                Logger.location("GPS-Daten gesendet um ${java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(currentTime))}")
             } else {
                 Logger.error("Konnte GPS-Daten nicht senden")
             }
@@ -534,11 +628,14 @@ class LocationService : Service(), LocationListener {
     }
     
     /**
-     * Setzt das ViewModel für UI-Updates
+     * Setzt das ViewModel für UI-Updates und aktualisiert sofort den Status
      */
     fun setViewModel(model: GPSViewModel) {
         this.viewModel = model
         viewModel?.isServiceRunning?.value = true
+        
+        // Sofort den aktuellen Status aktualisieren
+        updateViewModelStatus(currentState)
     }
     
     /**
@@ -583,6 +680,9 @@ class LocationService : Service(), LocationListener {
         viewModel?.isServiceRunning?.value = false
         viewModel?.updateConnectionStatus("Getrennt", false, false)
         viewModel = null
+        
+        // Statische Instanz löschen
+        instance = null
         
         super.onDestroy()
     }

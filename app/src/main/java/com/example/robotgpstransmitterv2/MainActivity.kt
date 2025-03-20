@@ -92,25 +92,13 @@ class MainActivity : AppCompatActivity() {
             }
         }
         
-        // Publish-Button
-        binding.btnPublish.setOnClickListener {
-            val isActive = viewModel.isAdvertised.value == true
-            val serviceIntent = Intent(this, LocationService::class.java).apply {
-                action = if (isActive) {
-                    Constants.ACTION_STOP_PUBLISHING
-                } else {
-                    Constants.ACTION_START_PUBLISHING
-                }
-            }
-            startService(serviceIntent)
-        }
-        
         // Koordinaten kopieren
         binding.btnCopy.setOnClickListener {
             val latitude = viewModel.latitude.value
             val longitude = viewModel.longitude.value
             
             if (latitude != null && longitude != null) {
+                // Formatiere die Koordinaten mit voller Genauigkeit, nur die Zahlen ohne Beschriftung
                 val clipboardText = "$latitude, $longitude"
                 val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 val clip = ClipData.newPlainText("GPS-Koordinaten", clipboardText)
@@ -126,7 +114,6 @@ class MainActivity : AppCompatActivity() {
         // Service-Status beobachten
         viewModel.isServiceRunning.observe(this, Observer { isRunning ->
             binding.btnConnect.text = if (isRunning) getString(R.string.disconnect) else getString(R.string.connect)
-            binding.btnPublish.isEnabled = isRunning && viewModel.connectionStatus.value?.contains("Verbunden") == true
         })
         
         // Verbindungsstatus beobachten
@@ -138,18 +125,6 @@ class MainActivity : AppCompatActivity() {
                 status.contains("Verbunden") -> binding.connectionStatus.setTextColor(ContextCompat.getColor(this, R.color.status_connected))
                 status.contains("wird") -> binding.connectionStatus.setTextColor(ContextCompat.getColor(this, R.color.status_waiting))
                 else -> binding.connectionStatus.setTextColor(ContextCompat.getColor(this, R.color.status_disconnected))
-            }
-            
-            // Publishing-Button nur aktivieren, wenn verbunden
-            binding.btnPublish.isEnabled = viewModel.isServiceRunning.value == true && status.contains("Verbunden")
-        })
-        
-        // Veröffentlichungsstatus beobachten
-        viewModel.isAdvertised.observe(this, Observer { isAdvertised ->
-            binding.btnPublish.text = if (isAdvertised) {
-                getString(R.string.stop_publishing)
-            } else {
-                getString(R.string.start_publishing)
             }
         })
         
@@ -273,6 +248,19 @@ class MainActivity : AppCompatActivity() {
             startService(serviceIntent)
         }
         viewModel.isServiceRunning.value = true
+        
+        // Verzögerung, um sicherzustellen, dass der Service gestartet ist
+        binding.root.postDelayed({
+            // Versuche, das ViewModel an den Service zu übergeben
+            val serviceInstance = LocationService.getInstance()
+            
+            if (serviceInstance != null) {
+                serviceInstance.setViewModel(viewModel)
+                Logger.service("ViewModel an LocationService übergeben")
+            } else {
+                Logger.error("Konnte LocationService-Instanz nicht finden")
+            }
+        }, 500)
     }
     
     private fun stopLocationService() {
@@ -298,5 +286,26 @@ class MainActivity : AppCompatActivity() {
             }
             else -> super.onOptionsItemSelected(item)
         }
+    }
+    
+    /**
+     * Wird aufgerufen, wenn die Activity zerstört wird.
+     * Wenn die App komplett geschlossen wird (isFinishing), beenden wir den Service.
+     */
+    override fun onDestroy() {
+        if (isFinishing && viewModel.isServiceRunning.value == true) {
+            Logger.service("App wird geschlossen, stoppe LocationService")
+            stopLocationService()
+        }
+        super.onDestroy()
+    }
+    
+    /**
+     * Wird aufgerufen, wenn die Activity in den Hintergrund geht.
+     * Hier beenden wir den Service nicht, damit er im Hintergrund weiterlaufen kann.
+     */
+    override fun onStop() {
+        super.onStop()
+        Logger.service("App geht in den Hintergrund, LocationService läuft weiter")
     }
 }

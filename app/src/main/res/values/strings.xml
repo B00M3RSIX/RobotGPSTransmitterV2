@@ -9,7 +9,7 @@
     <string name="stop_publishing">Veröffentlichung stoppen</string>
     <string name="connection_status">Verbindungsstatus: %1$s</string>
     <string name="messages_sent">Gesendete Nachrichten: %1$d</string>
-    <string name="coordinates">Koordinaten: %1$.6f, %2$.6f</string>
+    <string name="coordinates">Koordinaten:\nBreitengrad: %1$.15f\nLängengrad: %2$.15f</string>
     <string name="altitude">Höhe: %1$.2f m</string>
     <string name="accuracy">Genauigkeit: %1$.2f m</string>
     <string name="last_update">Letztes Update: %1$s</string>

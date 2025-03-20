@@ -1,12 +1,17 @@
 package com.example.robotgpstransmitterv2
 
 import android.content.Context
+import android.content.Intent
+import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.MenuItem
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.ViewModelProvider
 import com.example.robotgpstransmitterv2.databinding.ActivitySettingsBinding
+import com.example.robotgpstransmitterv2.service.LocationService
 import com.example.robotgpstransmitterv2.service.WebSocketManager
 import com.example.robotgpstransmitterv2.utils.Constants
 import com.example.robotgpstransmitterv2.utils.Logger
@@ -193,6 +198,9 @@ class SettingsActivity : AppCompatActivity() {
     }
     
     private fun saveSettings() {
+        // Prüfen, ob der Service läuft, um ihn später neu zu starten
+        val wasServiceRunning = viewModel.isServiceRunning.value == true
+        
         // Werte ins ViewModel übernehmen
         viewModel.serverUrl.value = binding.editServerUrl.text.toString().trim()
         viewModel.topicName.value = binding.editTopicName.text.toString().trim()
@@ -211,6 +219,33 @@ class SettingsActivity : AppCompatActivity() {
         // In SharedPreferences speichern
         val prefs = getSharedPreferences(Constants.PREFS_NAME, Context.MODE_PRIVATE).edit()
         viewModel.saveSettings(prefs)
+        
+        // Service neu starten, wenn er vorher lief
+        if (wasServiceRunning) {
+            // Service stoppen
+            val stopIntent = Intent(this, LocationService::class.java).apply {
+                action = Constants.ACTION_STOP_SERVICE
+            }
+            stopService(stopIntent)
+            
+            // Kurze Verzögerung, um sicherzustellen, dass der Service gestoppt wurde
+            Handler(Looper.getMainLooper()).postDelayed({
+                // Nachrichtenzähler zurücksetzen
+                viewModel.resetMessageCount()
+                
+                // Service neu starten
+                val startIntent = Intent(this, LocationService::class.java).apply {
+                    action = Constants.ACTION_START_SERVICE
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(startIntent)
+                } else {
+                    startService(startIntent)
+                }
+                
+                Toast.makeText(this, "Service mit neuen Einstellungen neu gestartet", Toast.LENGTH_SHORT).show()
+            }, 500)
+        }
     }
     
     private fun testConnection(serverUrl: String) {
@@ -238,9 +273,10 @@ class SettingsActivity : AppCompatActivity() {
                     runOnUiThread {
                         binding.btnTestConnection.isEnabled = true
                         binding.btnTestConnection.text = getString(R.string.test_connection)
+                        val errorMessage = t.message ?: "Unbekannter Fehler"
                         Toast.makeText(
                             this@SettingsActivity,
-                            "Verbindung fehlgeschlagen: ${t.message}",
+                            "Verbindung fehlgeschlagen: $errorMessage",
                             Toast.LENGTH_LONG
                         ).show()
                     }

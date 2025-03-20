@@ -495,7 +495,6 @@ An Android application that sends GPS location data to a WebSocket server at reg
   
 - **Publishing Control Section**:
   - Counter for messages sent
-  - Start/Stop Publishing button
   - Status message
   
 - **GPS Data Section**:
@@ -614,14 +613,9 @@ An Android application that sends GPS location data to a WebSocket server at reg
 #### Connect Button
 1. Verify settings availability
 2. Attempt WebSocket connection
-3. Update UI with connection status
-4. Enable/disable publishing controls based on result
-
-#### Start Publishing Button
-1. Verify WebSocket connection is established
-2. Test connection if needed
-3. Start foreground service with configuration
-4. Update UI to reflect running state
+3. Update UI with connection status return if not established
+4. Start foreground service with configuration
+5. Update UI to reflect running state
 
 ## 7. Implementation Details
 

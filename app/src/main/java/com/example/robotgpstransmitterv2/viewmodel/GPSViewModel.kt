@@ -13,7 +13,7 @@ import java.util.Locale
 class GPSViewModel : ViewModel() {
     // Service status
     val isServiceRunning = MutableLiveData<Boolean>(false)
-    val connectionStatus = MutableLiveData<String>("Disconnected")
+    val connectionStatus = MutableLiveData<String>("Getrennt")
     
     // GPS data
     val latitude = MutableLiveData<Double>()
@@ -127,38 +127,55 @@ class GPSViewModel : ViewModel() {
     
     /**
      * Aktualisiert die Standortdaten mit einem neuen Location-Objekt
+     * Verwendet postValue für Thread-Sicherheit
      */
     fun updateLocationData(location: Location) {
-        latitude.value = location.latitude
-        longitude.value = location.longitude
-        altitude.value = location.altitude
-        accuracy.value = location.accuracy
+        latitude.postValue(location.latitude)
+        longitude.postValue(location.longitude)
+        altitude.postValue(location.altitude)
+        accuracy.postValue(location.accuracy)
         
         // Zusätzliche Felder aktualisieren
-        lastUpdated.value = location.time
-        rawSpeed.value = location.speed
-        rawBearing.value = location.bearing
-        rawProvider.value = location.provider
+        lastUpdated.postValue(location.time)
+        rawSpeed.postValue(location.speed)
+        rawBearing.postValue(location.bearing)
+        rawProvider.postValue(location.provider)
         
         // ROS-Status basierend auf Provider aktualisieren
-        rosStatus.value = if (location.provider == android.location.LocationManager.GPS_PROVIDER) 1 else 0
+        rosStatus.postValue(if (location.provider == android.location.LocationManager.GPS_PROVIDER) 1 else 0)
     }
     
     /**
      * Erhöht den Nachrichtenzähler und aktualisiert den Zeitstempel der letzten Übertragung
+     * Verwendet postValue für Thread-Sicherheit
+     * @param timestamp Der Zeitstempel der Übertragung, standardmäßig die aktuelle Zeit
      */
-    fun incrementMessageCount() {
+    fun incrementMessageCount(timestamp: Long = System.currentTimeMillis()) {
         val current = messagesSent.value ?: 0
-        messagesSent.value = current + 1
-        lastTransmitTime.value = System.currentTimeMillis()
+        messagesSent.postValue(current + 1)
+        lastTransmitTime.postValue(timestamp)
+        
+        // Aktualisiere auch lastUpdated, um den Zeitpunkt der letzten Übertragung anzuzeigen
+        lastUpdated.postValue(timestamp)
+    }
+    
+    /**
+     * Setzt den Nachrichtenzähler zurück
+     */
+    fun resetMessageCount() {
+        messagesSent.postValue(0)
     }
     
     /**
      * Aktualisiert den Verbindungsstatus
      */
     fun updateConnectionStatus(status: String, isConnected: Boolean, isAdv: Boolean) {
-        connectionStatus.value = status
-        isAdvertised.value = isAdv
+        // Verwende postValue statt value, um Thread-sicher zu sein
+        connectionStatus.postValue(status)
+        isAdvertised.postValue(isAdv)
+        
+        // Log für Debugging
+        Logger.connection("ViewModel: Verbindungsstatus aktualisiert zu '$status', isConnected=$isConnected, isAdv=$isAdv")
     }
     
     /**

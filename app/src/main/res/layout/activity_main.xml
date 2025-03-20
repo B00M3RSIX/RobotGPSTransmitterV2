@@ -101,15 +101,6 @@
                         android:layout_marginBottom="16dp"
                         android:text="@string/messages_sent"
                         android:textColor="@color/white" />
-
-                    <Button
-                        android:id="@+id/btn_publish"
-                        android:layout_width="match_parent"
-                        android:layout_height="48dp"
-                        android:backgroundTint="@color/button_light_blue"
-                        android:enabled="false"
-                        android:text="@string/start_publishing"
-                        android:textColor="@color/white" />
                 </LinearLayout>
             </androidx.cardview.widget.CardView>
 
